@@ -139,7 +139,7 @@ class KaryawanResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListKaryawans::route('/'),
+            'index' => Pages\ListKaryawan::route('/'),
             'create' => Pages\CreateKaryawan::route('/create'),
             'edit' => Pages\EditKaryawan::route('/{record}/edit'),
         ];

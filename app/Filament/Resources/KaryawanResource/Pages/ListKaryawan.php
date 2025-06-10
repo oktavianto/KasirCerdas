@@ -6,7 +6,7 @@ use App\Filament\Resources\KaryawanResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
-class ListKaryawans extends ListRecords
+class ListKaryawan extends ListRecords
 {
     protected static string $resource = KaryawanResource::class;
 
