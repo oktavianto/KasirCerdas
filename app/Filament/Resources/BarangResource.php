@@ -14,7 +14,7 @@ use Filament\Tables\Table;
 use Filament\Resources\Resource;
 use Filament\Tables\Filters\Filter;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Enums\FiltersLayout;        
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\BarangResource\RelationManagers;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 use Filament\Tables\Columns\FileUpload;
+
 class BarangResource extends Resource
 {
     protected static ?string $model = Barang::class;
@@ -42,10 +43,7 @@ class BarangResource extends Resource
                 Forms\Components\Hidden::make('cabangs_id')
                     ->default(Auth::user()->cabangs_id),
                 Forms\Components\FileUpload::make('foto')
-                    ->disk('r2')
-                    ->directory('tmp')
-                    ->visibility('public')
-                    ->fetchFileInformation(false)
+                    ->image()
                     ->label('Foto Barang'),
                 Forms\Components\TextInput::make('kode')
                     ->placeholder('Kode Barang')
@@ -58,7 +56,10 @@ class BarangResource extends Resource
                 Forms\Components\Select::make('kategori')
                     ->placeholder('Kategori Barang')
                     ->preload()
-                    ->options(Kategori::all()->pluck('nama', 'nama'))
+                    ->options(Kategori::where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ])->pluck('nama', 'nama'))
                     ->required(),
                 Forms\Components\TextInput::make('harga_beli')
                     ->placeholder('Harga Beli')
@@ -76,6 +77,7 @@ class BarangResource extends Resource
                     ->numeric(),
                 Forms\Components\Select::make('diskon')
                     ->preload()
+                    ->required()
                     ->options(Diskon::where([
                         ['bisnis_id', Auth::user()->bisnis_id],
                         ['cabangs_id', Auth::user()->cabangs_id],
@@ -102,12 +104,22 @@ class BarangResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->query(
-                Barang::where([
-                    ['bisnis_id', '=', Auth::user()->bisnis_id],
-                    // ['cabangs_id', '=', Auth::user()->cabangs_id]
-                ])
-            )
+            ->query(function () {
+                $query = Barang::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->poll('5s')
             ->columns([
                 // Tables\Columns\FileUpload::make('upload')
@@ -154,44 +166,52 @@ class BarangResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                SelectFilter::make('cabangs_id')
-                ->label('Cabang')
-                    ->options(
-                        Cabang::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama_cabang', 'id')->toArray()
-                    ),
-                SelectFilter::make('nama')
-                ->label('Nama Barang')
-                    ->options(
-                        Barang::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama', 'nama')->toArray()
-                    ),
-                SelectFilter::make('satuan')
-                    ->options(
-                        Satuan::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama_satuan', 'nama_satuan')->toArray()
-                    ),
-                SelectFilter::make('kategori')
-                    ->options(
-                        Kategori::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama', 'nama')->toArray()
-                    ),
-                Filter::make('date_range')
-                    ->form([
-                        DatePicker::make('start_date')
-                            ->label('Start Date')
-                            ->required(),
-                        DatePicker::make('end_date')
-                            ->label('End Date')
-                            ->required(),
-                    ])
-                    ->columns(2)
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query->when(
-                            isset($data['start_date']) && isset($data['end_date']),
-                            function (Builder $query) use ($data): Builder {
-                                return $query->whereBetween('created_at', [$data['start_date'], $data['end_date']]);
-                            }
-                        );
-                    }),
-            ], layout: FiltersLayout::AboveContent)
+            ->filters(
+                array_filter([
+                    Auth::user()->hasRole(6) ?
+                        SelectFilter::make('cabangs_id')
+                        ->label('Cabang')
+                        ->options(
+                            Cabang::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama_cabang', 'id')->toArray()
+                        ) : null,
+
+                    SelectFilter::make('nama')
+                        ->label('Nama Barang')
+                        ->options(
+                            Barang::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama', 'nama')->toArray()
+                        ),
+
+                    SelectFilter::make('satuan')
+                        ->options(
+                            Satuan::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama_satuan', 'nama_satuan')->toArray()
+                        ),
+
+                    SelectFilter::make('kategori')
+                        ->options(
+                            Kategori::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama', 'nama')->toArray()
+                        ),
+
+                    Filter::make('date_range')
+                        ->form([
+                            DatePicker::make('start_date')
+                                ->label('Start Date')
+                                ->required(),
+                            DatePicker::make('end_date')
+                                ->label('End Date')
+                                ->required(),
+                        ])
+                        ->columns(2)
+                        ->query(function (Builder $query, array $data): Builder {
+                            return $query->when(
+                                isset($data['start_date']) && isset($data['end_date']),
+                                function (Builder $query) use ($data): Builder {
+                                    return $query->whereBetween('created_at', [$data['start_date'], $data['end_date']]);
+                                }
+                            );
+                        }),
+                ]),
+                layout: FiltersLayout::AboveContent
+            )
             ->actions([])
             ->bulkActions([
                 ExportBulkAction::make(),

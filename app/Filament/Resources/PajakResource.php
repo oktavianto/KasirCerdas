@@ -47,13 +47,22 @@ class PajakResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->query(
-                Pajak::where('bisnis_id', '=', Auth::user()->bisnis_id)
-                    ->where(function ($query) {
-                        $query->where('cabangs_id', Auth::user()->cabangs_id)
-                            ->orWhereNull('cabangs_id');
-                    })
-            )
+            ->query(function () {
+                $query = Pajak::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->poll('5s')
             ->columns([
                 Tables\Columns\TextColumn::make('nama_pajak')

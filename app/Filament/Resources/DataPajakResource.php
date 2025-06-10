@@ -19,6 +19,7 @@ use App\Filament\Resources\DataPajakResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 use App\Filament\Resources\DataPajakResource\RelationManagers;
+use Filament\Tables\Columns\Summarizers\Sum;
 
 class DataPajakResource extends Resource
 {
@@ -32,34 +33,45 @@ class DataPajakResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([
-            ]);
+            ->schema([]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-        ->query(
-            DataPajak::where([
-                ['bisnis_id', '=', Auth::user()->bisnis_id],
-            ])
-        )
-        ->poll('5s')
+            ->query(function () {
+                $query = DataPajak::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
+            ->poll('5s')
             ->columns([
                 Tables\Columns\TextColumn::make('kode_transaksi')
-                ->searchable()
-                ->label('Kode Transaksi'),
+                    ->searchable()
+                    ->label('Kode Transaksi'),
                 Tables\Columns\TextColumn::make('jumlah_pajak')
-                ->label('Jumlah Pajak')
-                ->money('IDR')
-                ->sortable(),
+                    ->label('Jumlah Pajak')
+                    ->money('IDR')
+                    ->summarize(Sum::make())
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->date()
                     ->sortable()
             ])
             ->filters([
                 SelectFilter::make('cabangs_id')
-                ->label('Cabang')
+                    ->label('Cabang')
                     ->options(
                         Cabang::where('bisnis_id', '=', Auth::user()->bisnis_id)->pluck('nama_cabang', 'id')->toArray()
                     ),
@@ -72,7 +84,7 @@ class DataPajakResource extends Resource
                             ->label('End Date')
                             ->required(),
                     ])
-                    ->columns(2) 
+                    ->columns(2)
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             isset($data['start_date']) && isset($data['end_date']),

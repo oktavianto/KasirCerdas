@@ -41,13 +41,21 @@ class BisnisResource extends Resource
                     ->maxLength(255),
             ]);
     }
-    
+
     public static function table(Table $table): Table
     {
         return $table
-            ->query(Bisnis::where([
-                ['id', '=', Auth::user()->bisnis_id]
-            ]))
+            ->query(function () {
+                $query = Bisnis::query();
+                if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->columns([
                 // Tables\Columns\TextColumn::make('id')
                 //     ->searchable(),
@@ -76,6 +84,23 @@ class BisnisResource extends Resource
         return [
             //
         ];
+    }
+    public static function canCreate(): bool {
+        if (!auth()->user()->hasRole(1)) {
+            return false;
+        } 
+        return true;
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        if (auth()->user()->hasRole(6)) {
+            return true;
+        }
+        else if (auth()->user()->hasRole(1)) {
+            return true;
+        }
+        return false;
     }
 
     public static function getPages(): array

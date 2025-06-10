@@ -50,24 +50,37 @@ class DiskonTransaksiResource extends Resource
                 Forms\Components\Toggle::make('is_Active'),
             ]);
     }
-    
+
     public static function table(Table $table): Table
     {
         return $table
-        ->query(
-            DiskonTransaksi::where([
-                ['bisnis_id', '=', Auth::user()->bisnis_id],
-                ['cabangs_id', '=', Auth::user()->cabangs_id]
-            ])
-        )
-        ->poll('5s')
+            ->query(function () {
+                $query = DiskonTransaksi::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
+            ->poll('5s')
             ->columns([
                 Tables\Columns\TextColumn::make('tipe_diskon')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('nama_diskon')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('jumlah_diskon')
-                    ->formatStateUsing(fn ($state) => $state <= 100 ? "$state%" : "IDR " . number_format($state, 0, ',', '.')) 
+                    ->formatStateUsing(fn($state) => $state <= 100 ? "$state%" : "IDR " . number_format($state, 0, ',', '.'))
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('minimum_pembelian')
+                    ->formatStateUsing(fn($state) => $state <= 100 ? "$state%" : "IDR " . number_format($state, 0, ',', '.'))
                     ->sortable(),
                 Tables\Columns\ToggleColumn::make('is_Active'),
                 Tables\Columns\TextColumn::make('status')
@@ -83,21 +96,21 @@ class DiskonTransaksiResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                    ])
-                    ->filters([
-                        //
-                    ])
-                    ->actions([
-                        Tables\Actions\EditAction::make(),
-                        Tables\Actions\DeleteAction::make(),
-                    ])
-                    ->bulkActions([
-                        Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\DeleteBulkAction::make(),
-                        ]),
-                    ]);
+            ])
+            ->filters([
+                //
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
     }
-    
+
 
     public static function getRelations(): array
     {

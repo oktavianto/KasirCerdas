@@ -43,12 +43,22 @@ class SatuanResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->query(
-                Satuan::where([
-                    ['bisnis_id', '=', Auth::user()->bisnis_id],
-                    ['cabangs_id', '=', Auth::user()->cabangs_id]
-                ])
-            )
+            ->query(function () {
+                $query = Satuan::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('nama_satuan')
                     ->searchable(),

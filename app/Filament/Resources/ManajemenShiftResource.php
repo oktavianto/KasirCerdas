@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use Filament\Forms;
 use App\Models\User;
+use App\Models\DataShift;
 use Filament\Tables;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
@@ -34,17 +35,22 @@ class ManajemenShiftResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->query(User::where([
-                ['bisnis_id', '=', Auth::user()->bisnis_id],
-                ['cabangs_id', '=', Auth::user()->cabangs_id]
-            ]))
-            // ->query(function () {
-            //     $query = User::query();
-            //     $query->where('bisnis_id', Auth::user()->bisnis_id);
-            //     if (Auth::user()->cabangs_id) {
-            //         $query->where('cabangs_id', Auth::user()->cabangs_id);
-            //     }
-            // })
+            ->query(function () {
+                $query = User::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
@@ -53,10 +59,9 @@ class ManajemenShiftResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
                 Tables\Columns\SelectColumn::make('shift')
-                ->options([
-                    '1' => 'Shift Pagi',
-                    '2' => 'Shift Sore'
-                ])
+                ->options(DataShift::where([
+                    
+                ])->pluck('nama_shift', 'shift'))
                 ->selectablePlaceholder(false),
                 Tables\Columns\TextColumn::make('bisnis.nama_bisnis')
                     ->badge()
@@ -106,7 +111,7 @@ class ManajemenShiftResource extends Resource
 
     // public static function shouldRegisterNavigation(): bool
     // {
-    //     if(!auth()->user()->hasRole('super_admin')) {
+    //     if(!auth()->user()->hasRole(1)) {
     //         return false;   
     //     }
     //     return true;

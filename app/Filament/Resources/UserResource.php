@@ -18,7 +18,7 @@ use App\Filament\Resources\UserResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\UserResource\RelationManagers;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role; // Impor model Role dari Spatie
+use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Gate;
 
 class UserResource extends Resource
@@ -27,7 +27,7 @@ class UserResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-user-plus';
     protected static ?string $activeNavigationIcon = 'heroicon-m-user-plus';
     protected static ?string $navigationGroup = 'Setting';
-    protected static ?string $navigationLabel = 'Pendataan Owner';
+    protected static ?string $navigationLabel = 'Pendataan Admin Bisnis';
 
     public static function form(Form $form): Form
     {
@@ -81,17 +81,22 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->query(function () {
+                $query = User::query();
+                    $query->whereHas('roles', function ($query) {
+                        $query->where('roles.id', '=', 6);
+                    })->with('roles');
+                return $query;
+            })
             ->poll('5s')
             ->columns([
-
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('no_hp')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
-                Tables\Columns\SelectColumn::make('roles')
-                    ->options(Role::all()->pluck('name', 'id')),
+                Tables\Columns\TextColumn::make('roles.name')->badge(), 
                 Tables\Columns\TextColumn::make('bisnis.nama_bisnis')
                     ->badge()
                     ->color('success')
@@ -137,11 +142,11 @@ class UserResource extends Resource
         ];
     }
 
-    // public static function shouldRegisterNavigation(): bool
-    // {
-    //     if(!auth()->user()->hasRole('super_admin')) {
-    //         return false;   
-    //     }
-    //     return true;
-    // }
+    public static function shouldRegisterNavigation(): bool
+    {
+        if (!auth()->user()->hasRole(1)) {
+            return false;
+        }
+        return true;
+    }
 }

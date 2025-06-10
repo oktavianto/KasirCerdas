@@ -33,8 +33,11 @@ class DataShiftResource extends Resource
                 Forms\Components\TextInput::make('shift')
                     ->required()
                     ->numeric(),
+                Forms\Components\TextInput::make('nama_shift')
+                    ->label('Nama Shift')
+                    ->required(),
                 Forms\Components\TimePicker::make('shift_start')
-                    ->seconds(false)    
+                    ->seconds(false)
                     ->label('Jam Shift Dimulai')
                     ->required(),
                 Forms\Components\TimePicker::make('shift_end')
@@ -48,10 +51,22 @@ class DataShiftResource extends Resource
     {
         return $table
             ->poll('5s')
-            ->query(DataShift::where([
-                ['bisnis_id', '=', Auth::user()->bisnis_id],
-                ['cabangs_id', '=', Auth::user()->cabangs_id],
-            ]))
+            ->query(function () {
+                $query = DataShift::query();
+                if (Auth::user()->hasRole(7)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id],
+                        ['cabangs_id', '=', Auth::user()->cabangs_id]
+                    ]);
+                } else if (Auth::user()->hasRole(6)) {
+                    $query->where([
+                        ['bisnis_id', '=', Auth::user()->bisnis_id]
+                    ]);
+                } else if (Auth::user()->hasRole(1)) {
+                    $query->get();
+                }
+                return $query;
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('shift')
                     ->label('Shift'),
@@ -73,17 +88,18 @@ class DataShiftResource extends Resource
             ]);
     }
 
-    public static  function canCreate():bool {
-        $shiftCount = DataShift::where('bisnis_id', Auth::user()->bisnis_id)
-            ->where('cabangs_id', Auth::user()->cabangs_id)
-            ->count();
+    // public static  function canCreate(): bool
+    // {
+    //     $shiftCount = DataShift::where('bisnis_id', Auth::user()->bisnis_id)
+    //         ->where('cabangs_id', Auth::user()->cabangs_id)
+    //         ->count();
 
-        if ($shiftCount >= 2) {
-            return(false);
-        } else {
-            return(true);   
-        }
-    }
+    //     if ($shiftCount >= 2) {
+    //         return (false);
+    //     } else {
+    //         return (true);
+    //     }
+    // }
     public static function getRelations(): array
     {
         return [
@@ -99,11 +115,14 @@ class DataShiftResource extends Resource
             'edit' => Pages\EditDataShift::route('/{record}/edit'),
         ];
     }
-    // public static function shouldRegisterNavigation(): bool
-    // {
-    //     if(!auth()->user()->hasRole('super_admin')) {
-    //         return false;   
-    //     }
-    //     return true;
-    // }
+    public static function shouldRegisterNavigation(): bool
+    {
+        if(!auth()->user()->hasRole(6)) {
+            return false;   
+        } else if (!auth()->user()->hasRole(1)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
 }
