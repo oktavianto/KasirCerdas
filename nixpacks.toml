@@ -6,7 +6,15 @@ cmds = [
     "mkdir -p /etc/supervisor/conf.d/",
     "cp /assets/worker-*.conf /etc/supervisor/conf.d/",
     "cp /assets/supervisord.conf /etc/supervisord.conf",
+    "cd /app && npm install --prefer-offline --no-audit --progress=false",
+    "cd /app && npm run build",
+    "cd /app && php artisan config:cache",
+    "cd /app && php artisan route:cache",
+    "cd /app && php artisan view:cache",
+    "cd /app && php artisan optimize",
+    "cd /app && php artisan filament:optimize",
     "chmod +x /assets/start.sh",
+    "chown -R www-data:www-data /app",
     "..."
 ]
 
@@ -19,6 +27,20 @@ cmd = '/assets/start.sh'
 
 # Transform the nginx configuration
 node /assets/scripts/prestart.mjs /assets/nginx.template.conf /etc/nginx.conf
+
+# Run shield:generate command to generate permissions
+cd /app && php artisan shield:generate --all
+# Permissions for storage and bootstrap/cache
+chown -R www-data:www-data /app/storage
+chown -R www-data:www-data /app/bootstrap/cache
+# Permissions for storage and bootstrap/cache
+chmod -R 775 /app/storage
+chmod -R 775 /app/bootstrap/cache
+
+# Send webhook notification after deployment
+curl -X POST "https://open.larksuite.com/open-apis/bot/v2/hook/c3f1bbed-bd23-49b9-a98c-d37a3a449924" \
+  -H "Content-Type: application/json" \
+  -d '{"msg_type":"post","content":{"post":{"en_us":{"title":"ecoforpest-web Update Notification","content":[[{"tag":"text","text":"New update has been deployed to Development Site."},{"tag":"at","user_id":"all"}],[{"tag":"a","text":"⚙️ Check Github","href":"https://github.com/ionbit/ecoforpest-web"}],[{"tag":"a","text":"🚀 Go to Development Site","href":"https://ecoforpest.dev.ionbit.id/"}]]}}}}'
 
 # Start supervisor
 supervisord -c /etc/supervisord.conf -n
@@ -127,8 +149,8 @@ http {
     server_names_hash_bucket_size 128; # this seems to be required for some vhosts
 
     server {
-        listen ${PORT};
-        listen [::]:${PORT};
+        listen 9003;
+        listen [::]:9003;
         server_name localhost;
 
         $if(NIXPACKS_PHP_ROOT_DIR) (
